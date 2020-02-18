@@ -22,11 +22,16 @@ def percentOfCapacityGenerated(capacity, produced):
         print(e, 'could not convert value to float')
     else:
         percent = float(produced)/float(capacity)
-        formattedPercent = str(percent * 100) + '%'
+        formattedPercent = str(round(percent * 100, 3)) + '%'
         return formattedPercent
 
 def splitBracketFromString(inputString):
     return inputString.split('(')[0]
+
+localTranslationDict = {}
+with open('chineseEnglishDictionary.txt') as json_file:
+    localTranslationDict = json.load(json_file)
+
 
 response = requests.get(URL)
 print(response.status_code)
@@ -58,24 +63,34 @@ for entry in raw_dict['aaData']:
         generationPerDeviceCapacityRatios.append(entry[4])
     comments.append(entry[5])
 
-# TODO: powerTypes list no longer translates...consider putting characters into a small unique set, and translating that, then map back to list.
-powerTypeListEnglish = translator.translate(powerTypes)
-# sending blank elements to translation function, breaks the translation
-# lastColumnEnglish = translator.translate(comments)
-
-unitNameEnglish = translator.translate(unitNames)
-
-
 columns = ['Power Type','Unit Name', 'Power Capacity', 'Net Power Generated', 'Ratio Generated','Time Reported (Taiwan CST)']
-data = {columns[0]: powerTypeListEnglish,
-        columns[1]: unitNameEnglish,
+dataChinese = {columns[0]: powerTypes,
+        columns[1]: unitNames,
         columns[2]: deviceCapacities,
         columns[3]: netPowerGenerations,
         columns[4]: generationPerDeviceCapacityRatios,
-        columns[5]: [dateTimeTaiwan] * len(powerTypeListEnglish)}
-dataFrame = pd.DataFrame(data=data)
+        columns[5]: [dateTimeTaiwan] * len(powerTypes)}
+dataFrameChinese = pd.DataFrame(data=dataChinese)
+print(dataFrameChinese.head(5))
 
-print(dataFrame.head(5))
+englishRowsList = []
+for index, row in dataFrameChinese.iterrows():
+    powType_CH = row['Power Type']
+    name_CH = row['Unit Name']
+    powerTypeEnglish = localTranslationDict[powType_CH] if powType_CH in localTranslationDict else translator.translate(powType_CH).text
+    unitNameEnglish = localTranslationDict[name_CH] if name_CH in localTranslationDict else translator.translate(name_CH).text
+    englishRowsList.append({columns[0]: powerTypeEnglish,
+                            columns[1]: unitNameEnglish,
+                            columns[2]: row['Power Capacity'],
+                            columns[3]: row['Net Power Generated'],
+                            columns[4]: row['Ratio Generated'],
+                            columns[5]: row['Time Reported (Taiwan CST)']})
+
+
+
+dataFrameEnglish = pd.DataFrame(data=englishRowsList, columns=columns)
+print(dataFrameEnglish.head(10))
+print(dataFrameEnglish.tail(10))
 
 print('done')
 
